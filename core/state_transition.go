@@ -80,6 +80,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
+		// QUESTION: did the original Ethereum charge a different gas price for contract creation?
 		gas = params.TxGasContractCreation
 	} else {
 		gas = params.TxGas
@@ -151,16 +152,20 @@ func (st *StateTransition) useGas(amount uint64) error {
 
 func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
+	log.TraceMiner("Calculating amount of gas that will remain after processing this transaction", "gas left", mgval)
 	if st.state.GetBalance(st.msg.From()).Cmp(mgval) < 0 {
+		log.TraceMiner("I am sorry Dave. I'm afraid I can't let you do that. You don't have enough gas to complete your mission. ")
 		return errInsufficientBalanceForGas
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
 		return err
 	}
 	st.gas += st.msg.Gas()
+	log.TraceMiner("Add the message gas to the state", "state gas", st.gas)
 
 	st.initialGas = st.msg.Gas()
 	st.state.SubBalance(st.msg.From(), mgval)
+	log.TraceMiner("Subtract the gas from the users state balance")
 	return nil
 }
 
@@ -168,11 +173,15 @@ func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
 	if st.msg.CheckNonce() {
 		nonce := st.state.GetNonce(st.msg.From())
+		log.TraceMiner("Checking to make sure the nonce is just right", "transaction nonce", nonce, "state nonce", st.msg.Nonce())
 		if nonce < st.msg.Nonce() {
+			log.TraceMiner("This nonce is too hot!!!!")
 			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
 			return ErrNonceTooLow
+			log.TraceMiner("This nonce is too cold!!!!")
 		}
+		log.TraceMiner("This nonce is too jusssst right!!!!")
 	}
 	return st.buyGas()
 }
@@ -181,16 +190,20 @@ func (st *StateTransition) preCheck() error {
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
 func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bool, err error) {
+	log.TraceMiner("Transitioning the state by applying the current message")
 	if err = st.preCheck(); err != nil {
 		return
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
+	log.TraceMiner("Getting the address of the sender from the transaction message ???", "sender", sender)
+	// QUESTION: is this due to the fork which caused eth classic? Or due to the fork from frontier?
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.BlockNumber)
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
 	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
+	log.TraceMiner("Paying the intrinsic gas (transaction fee before any code is run) ", "gas", gas)
 	if err != nil {
 		return nil, 0, false, err
 	}

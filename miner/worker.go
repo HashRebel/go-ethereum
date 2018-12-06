@@ -691,14 +691,17 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
+	log.TraceMiner("Take a snapshot of the state before sending to the core to be applied", "state", state)
 
 	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
+		log.TraceMiner("Error ocurred.... Setting state to snapshot")
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
 	w.current.txs = append(w.current.txs, tx)
 	w.current.receipts = append(w.current.receipts, receipt)
+	log.TraceMiner("Appending transaction and receipt to the current state")
 
 	return receipt.Logs, nil
 }
@@ -711,6 +714,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+		log.TraceMiner("Current gas pool is being initialized", "w.current.gasPool", w.current.gasPool)
 	}
 
 	var coalescedLogs []*types.Log
@@ -726,6 +730,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			// Notify resubmit loop to increase resubmitting interval due to too frequent commits.
 			if atomic.LoadInt32(interrupt) == commitInterruptResubmit {
 				ratio := float64(w.current.header.GasLimit-w.current.gasPool.Gas()) / float64(w.current.header.GasLimit)
+				log.TraceMiner("Checking the ratio of current gas the the gas limit" "ratio", ratio)
 				if ratio < 0.1 {
 					ratio = 0.1
 				}
@@ -738,29 +743,35 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		}
 		// If we don't have enough gas for any further transactions then we're done
 		if w.current.gasPool.Gas() < params.TxGas {
-			log.Trace("Not enough gas for further transactions", "have", w.current.gasPool, "want", params.TxGas)
+			log.Info("Not enough gas for further transactions", "have", w.current.gasPool, "want", params.TxGas)
 			break
 		}
 		// Retrieve the next transaction and abort if all done
 		tx := txs.Peek()
 		if tx == nil {
+			log.TraceMiner("Transactions are complete")
 			break
 		}
+		log.TraceMiner("Getting next transation", "tx", tx)
 		// Error may be ignored here. The error has already been checked
 		// during transaction acceptance is the transaction pool.
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
+		log.TraceMiner("Derive the address from the signature", "address", from)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.config.EIP155Block)
+			log.TraceMiner("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.config.EIP155Block)
 
 			txs.Pop()
 			continue
 		}
+		log.TraceMiner("The transaction is replay protected and will be process further", "address", from)
+		
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
+		log.TraceMiner("Preparing the current state by populating the hashes", "transaction hash", tx.Hash(), "transaction index", w.current.tcount, "block hash", common.Hash())
 
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch err {

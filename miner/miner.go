@@ -53,6 +53,7 @@ type Miner struct {
 }
 
 func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
+	log.Info("*************** MINER DEMO ****************** Step 1. Newing up a miner!", "test1", "test2")
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,

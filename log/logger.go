@@ -123,6 +123,7 @@ type Logger interface {
 	Warn(msg string, ctx ...interface{})
 	Error(msg string, ctx ...interface{})
 	Crit(msg string, ctx ...interface{})
+	TraceMiner(msg string, ctx ...interface{})
 }
 
 type logger struct {
@@ -183,6 +184,10 @@ func (l *logger) Error(msg string, ctx ...interface{}) {
 func (l *logger) Crit(msg string, ctx ...interface{}) {
 	l.write(msg, LvlCrit, ctx, skipLevel)
 	os.Exit(1)
+}
+
+func (l *logger) TraceMiner(msg string, ctx ...interface{}) {
+	l.write(fmt.Sprintf("HASH_REBEL_LOG_STAMP: %s", msg), LvlTrace, ctx, skipLevel)
 }
 
 func (l *logger) GetHandler() Handler {
