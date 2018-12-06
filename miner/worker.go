@@ -691,7 +691,7 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
-	log.TraceMiner("Take a snapshot of the state before sending to the core to be applied", "state", state)
+	log.TraceMiner("Take a snapshot of the state before sending to the core to be applied", "state", snap)
 
 	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
@@ -730,7 +730,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			// Notify resubmit loop to increase resubmitting interval due to too frequent commits.
 			if atomic.LoadInt32(interrupt) == commitInterruptResubmit {
 				ratio := float64(w.current.header.GasLimit-w.current.gasPool.Gas()) / float64(w.current.header.GasLimit)
-				log.TraceMiner("Checking the ratio of current gas the the gas limit" "ratio", ratio)
+				log.TraceMiner("Checking the ratio of current gas the the gas limit", "ratio", ratio)
 				if ratio < 0.1 {
 					ratio = 0.1
 				}
@@ -768,10 +768,10 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			continue
 		}
 		log.TraceMiner("The transaction is replay protected and will be process further", "address", from)
-		
+
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
-		log.TraceMiner("Preparing the current state by populating the hashes", "transaction hash", tx.Hash(), "transaction index", w.current.tcount, "block hash", common.Hash())
+		log.TraceMiner("Preparing the current state by populating the hashes", "transaction hash", tx.Hash(), "transaction index", w.current.tcount, "block hash", common.Hash{})
 
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch err {

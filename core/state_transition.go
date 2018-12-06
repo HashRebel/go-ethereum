@@ -80,11 +80,13 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if contractCreation && homestead {
-		// QUESTION: did the original Ethereum charge a different gas price for contract creation?
 		gas = params.TxGasContractCreation
+		log.TraceMiner("Getting the base cost for creating a contract transaction.", "gas", gas)
 	} else {
 		gas = params.TxGas
+		log.TraceMiner("Getting the base cost for creating a transaction:", "gas", gas)
 	}
+
 	// Bump the required gas by the amount of transactional data
 	if len(data) > 0 {
 		// Zero and non-zero bytes are priced differently
@@ -105,6 +107,7 @@ func IntrinsicGas(data []byte, contractCreation, homestead bool) (uint64, error)
 			return 0, vm.ErrOutOfGas
 		}
 		gas += z * params.TxDataZeroGas
+		log.TraceMiner("Adding the gas cost of the transactional data", "gas", gas)
 	}
 	return gas, nil
 }
@@ -203,6 +206,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 
 	// Pay intrinsic gas
 	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
+	/// ******************************************* THIS IS MY CURRENT PLACE *************************************
 	log.TraceMiner("Paying the intrinsic gas (transaction fee before any code is run) ", "gas", gas)
 	if err != nil {
 		return nil, 0, false, err
