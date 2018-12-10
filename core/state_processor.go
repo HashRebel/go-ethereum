@@ -91,7 +91,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	if err != nil {
 		return nil, 0, err
 	}
-	log.TraceMiner("Convert tx to core message and verified that the transaction signer is correct")
+	log.TraceMiner("Convert tx to core message and verified that the transaction signer is correct.")
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(msg, header, bc, author)
 	// Create a new environment which holds all relevant information
@@ -110,6 +110,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
 	}
 	*usedGas += gas
+	log.TraceMiner("Update the state with the pending changes and then add the used gas.", "gas", gas, "total used gas", *usedGas)
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used by the tx
 	// based on the eip phase, we're passing whether the root touch-delete accounts.
@@ -123,6 +124,7 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = statedb.GetLogs(tx.Hash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
+	log.TraceMiner("Create a receipt.", "TxHas", tx.Hash())
 
 	return receipt, gas, err
 }

@@ -164,11 +164,11 @@ func (st *StateTransition) buyGas() error {
 		return err
 	}
 	st.gas += st.msg.Gas()
-	log.TraceMiner("Add the message gas to the state", "state gas", st.gas)
+	log.TraceMiner("Add the gas from he message to the state. ", "gas", st.gas)
 
 	st.initialGas = st.msg.Gas()
 	st.state.SubBalance(st.msg.From(), mgval)
-	log.TraceMiner("Subtract the gas from the users state balance")
+	log.TraceMiner("Subtract the gas from the users state balance.")
 	return nil
 }
 
@@ -193,21 +193,19 @@ func (st *StateTransition) preCheck() error {
 // returning the result including the used gas. It returns an error if failed.
 // An error indicates a consensus issue.
 func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bool, err error) {
-	log.TraceMiner("Transitioning the state by applying the current message")
+	log.TraceMiner("Transitioning the state by applying the current message.")
 	if err = st.preCheck(); err != nil {
 		return
 	}
 	msg := st.msg
 	sender := vm.AccountRef(msg.From())
-	log.TraceMiner("Getting the address of the sender from the transaction message ???", "sender", sender)
-	// QUESTION: is this due to the fork which caused eth classic? Or due to the fork from frontier?
+	log.TraceMiner("Getting the address of the sender from the transaction message.", "sender", sender)
 	homestead := st.evm.ChainConfig().IsHomestead(st.evm.BlockNumber)
 	contractCreation := msg.To() == nil
 
 	// Pay intrinsic gas
 	gas, err := IntrinsicGas(st.data, contractCreation, homestead)
-	/// ******************************************* THIS IS MY CURRENT PLACE *************************************
-	log.TraceMiner("Paying the intrinsic gas (transaction fee before any code is run) ", "gas", gas)
+	log.TraceMiner("Paying the intrinsic gas (transaction fee before any code is run). ", "gas", gas)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -223,13 +221,17 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		vmerr error
 	)
 	if contractCreation {
+		log.TraceMiner("Calling the EVM to create the contract")
 		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
+		log.TraceMiner("Interacting with an existing contract.")
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		log.TraceMiner("Increment the nonce.", "old nonce", st.state.GetNonce(sender.Address()), "new nonce", st.state.GetNonce(msg.From()))
 		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
 	if vmerr != nil {
+		log.TraceMiner("An error occurred in the VM.", "err", vmerr)
 		log.Debug("VM returned with error", "err", vmerr)
 		// The only possible consensus-error would be if there wasn't
 		// sufficient balance to make the transfer happen. The first
@@ -238,6 +240,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 			return nil, 0, false, vmerr
 		}
 	}
+	log.TraceMiner("Refunding unused gas.")
 	st.refundGas()
 	st.state.AddBalance(st.evm.Coinbase, new(big.Int).Mul(new(big.Int).SetUint64(st.gasUsed()), st.gasPrice))
 

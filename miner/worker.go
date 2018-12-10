@@ -695,7 +695,7 @@ func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Addres
 
 	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, vm.Config{})
 	if err != nil {
-		log.TraceMiner("Error ocurred.... Setting state to snapshot")
+		log.TraceMiner("Error occurred.... Setting state back to the snapshot")
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
 	}
@@ -749,7 +749,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		// Retrieve the next transaction and abort if all done
 		tx := txs.Peek()
 		if tx == nil {
-			log.TraceMiner("Transactions are complete")
+			log.TraceMiner("There are no more transactions to complete. Break out of the loop.")
 			break
 		}
 		log.TraceMiner("Getting next transation", "tx", tx)
@@ -758,7 +758,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		//
 		// We use the eip155 signer regardless of the current hf.
 		from, _ := types.Sender(w.current.signer, tx)
-		log.TraceMiner("Derive the address from the signature", "address", from)
+		log.TraceMiner("Derive the sender address from the signature (V, R, S)", "address", from)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number) {
@@ -767,22 +767,23 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			txs.Pop()
 			continue
 		}
-		log.TraceMiner("The transaction is replay protected and will be process further", "address", from)
+		log.TraceMiner("The transaction is replay protected (post EIP155)")
 
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
-		log.TraceMiner("Preparing the current state by populating the hashes", "transaction hash", tx.Hash(), "transaction index", w.current.tcount, "block hash", common.Hash{})
+		log.TraceMiner("Preparing the current state by populating the hashes.", "transaction hash", tx.Hash(), "transaction index", w.current.tcount, "block hash", common.Hash{})
 
 		logs, err := w.commitTransaction(tx, coinbase)
 		switch err {
 		case core.ErrGasLimitReached:
+			// QUESTION: need clarification on the comment. What exactly is happening here?
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Trace("Gas limit exceeded for current block", "sender", from)
 			txs.Pop()
 
 		case core.ErrNonceTooLow:
 			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+			log.Trace("Nonce too low error occurred: \"New head notification data race between the transaction pool and miner, shift\" Why sift vs pop?", "sender", from, "nonce", tx.Nonce())
 			txs.Shift()
 
 		case core.ErrNonceTooHigh:
@@ -795,6 +796,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			coalescedLogs = append(coalescedLogs, logs...)
 			w.current.tcount++
 			txs.Shift()
+			log.TraceMiner("The transaction was added and the logs collected.", "logs", coalescedLogs)
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
@@ -818,6 +820,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 			*cpy[i] = *l
 		}
 		go w.mux.Post(core.PendingLogsEvent{Logs: cpy})
+		log.Trace("Setting the event logs", "cpy", cpy)
 	}
 	// Notify resubmit loop to decrease resubmitting interval if current interval is larger
 	// than the user-specified one.

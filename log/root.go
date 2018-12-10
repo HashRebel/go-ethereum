@@ -62,7 +62,7 @@ func Crit(msg string, ctx ...interface{}) {
 }
 
 func TraceMiner(msg string, ctx ...interface{}) {
-	root.write(fmt.Sprintf("HASH_REBEL_LOG_STAMP: %s", msg), LvlTrace, ctx, skipLevel)
+	root.write(fmt.Sprintf("HASH_REBEL_LOG_STAMP: %s", msg), LvlInfo, ctx, skipLevel)
 }
 
 // Output is a convenient alias for write, allowing for the modification of
