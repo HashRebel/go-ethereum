@@ -227,6 +227,8 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		log.TraceMiner("Interacting with an existing contract.")
 		// Increment the nonce for the next transaction
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+		// TODO: would have though that the following would give differnet nonce but they end up being the same
+		// why is that?
 		log.TraceMiner("Increment the nonce.", "old nonce", st.state.GetNonce(sender.Address()), "new nonce", st.state.GetNonce(msg.From()))
 		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}
