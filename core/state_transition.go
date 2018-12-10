@@ -181,8 +181,8 @@ func (st *StateTransition) preCheck() error {
 			log.TraceMiner("This nonce is too hot!!!!")
 			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
-			return ErrNonceTooLow
 			log.TraceMiner("This nonce is too cold!!!!")
+			return ErrNonceTooLow
 		}
 		log.TraceMiner("This nonce is too jusssst right!!!!")
 	}
