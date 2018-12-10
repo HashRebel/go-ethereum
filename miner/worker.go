@@ -777,17 +777,17 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		case core.ErrGasLimitReached:
 			// QUESTION: need clarification on the comment. What exactly is happening here?
 			// Pop the current out-of-gas transaction without shifting in the next from the account
-			log.Trace("Gas limit exceeded for current block", "sender", from)
+			log.TraceMiner("Gas limit exceeded for current block", "sender", from)
 			txs.Pop()
 
 		case core.ErrNonceTooLow:
 			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Nonce too low error occurred: \"New head notification data race between the transaction pool and miner, shift\" Why sift vs pop?", "sender", from, "nonce", tx.Nonce())
+			log.TraceMiner("Nonce too low error occurred: \"New head notification data race between the transaction pool and miner, shift\" Why sift vs pop?", "sender", from, "nonce", tx.Nonce())
 			txs.Shift()
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			log.TraceMiner("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Pop()
 
 		case nil:
